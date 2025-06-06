@@ -1,0 +1,139 @@
+##### 필요한 라이브러리 임포트
+import json
+import torch
+import joblib
+import numpy as np
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sentence_transformers import SentenceTransformer
+from safetensors.torch import load_file 
+from qdrant_client import QdrantClient
+from openai import OpenAI
+import requests
+
+# 경고 메세지 무시
+import warnings
+warnings.filterwarnings("ignore")
+
+##### 모델 및 라벨 인코더 로딩
+# 모델 및 라벨 인코더 로딩
+subcat_model_path = "C:/Users/USER/Downloads/sub_model_backup"
+
+# 1. 모델 구조 생성
+subcat_tokenizer = AutoTokenizer.from_pretrained(subcat_model_path)
+subcat_model = AutoModelForSequenceClassification.from_pretrained(subcat_model_path)
+
+# 2. safetensors로 state_dict 불러오기
+state_dict = load_file(f"{subcat_model_path}/model.safetensors", device="cpu")
+subcat_model.load_state_dict(state_dict)
+subcat_model.eval()
+
+le = joblib.load(f"{subcat_model_path}/sub_encoder.pkl")
+
+##### 임베딩 모델 로딩
+from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+
+# Qdrant 접속
+qdrant_client = QdrantClient(
+    url="https://2a09054d-de92-436e-bf8c-158f44d82df4.us-east4-0.gcp.cloud.qdrant.io:6333",
+    api_key="",
+    timeout=60.0
+)
+
+# 임베딩 모델 로딩 (질문 검색용)
+embed_model = SentenceTransformer(
+    "BM-K/KoSimCSE-roberta",
+    # use_auth_token=""
+)
+
+##### 질문 검색
+# subcategory → category 매핑 딕셔너리
+subcategory_to_category = {
+    '학적': '학사', '성적': '학사', '수업': '학사', '교양': '학사', '교직': '학사',
+    '복지시설': '일반', '예비군': '일반', '등록': '일반', 'it서비스': '일반', '도서관': '일반',
+    '기타': '일반', '기숙사': '일반', '제증명/학생증': '일반', '학생지원/교통': '일반',
+    '장학': '장학',
+    '외국인유학생': '국제', '한국어연수': '국제', '교환학생': '국제', '어학연수': '국제',
+    '취업': '진로', '대학원': '진로', '자격증': '진로',
+    '동아리': '동아리'
+}
+
+# 질문 → 서브카테고리 분류 함수
+def predict_subcategory(question, model, tokenizer, le):
+    inputs = tokenizer(question, return_tensors="pt", truncation=True, padding=True, max_length=256)
+    with torch.no_grad():
+        outputs = model(**inputs)
+        pred = torch.argmax(outputs.logits, dim=1).item()
+    subcat = le.inverse_transform([pred])[0]
+    return subcat
+
+# Qdrant에서 유사 질문 5개(유사도 0.7 이상만) 검색
+def search_similar_questions(question, collection_name, embed_model, client, top_k=5, threshold=0.7):
+    query_vector = embed_model.encode(question).tolist()
+    results = client.search(
+        collection_name=f"dku_{collection_name}",
+        query_vector=query_vector,
+        limit=top_k,
+        with_payload=True,
+        with_vectors=True  # 유사도 계산을 위해 벡터도 가져옴
+    )
+    # Qdrant는 score가 1에 가까울수록 유사 (cosine similarity)
+    filtered = [
+        (hit.payload["question"], hit.payload["answer"], hit.score)
+        for hit in results if hit.score >= threshold
+    ]
+    return filtered
+
+##### 답변 생성
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
+# API_KEY = ""
+
+def generate_answer_openrouter(question, context_list, system_prompt=None):
+
+    context = "\n".join([f"Q: {q}\nA: {a}" for q, a, score in context_list])
+    prompt = (
+        f"{system_prompt or ''}\n"
+        f"질문: {question}\n"
+        f"참고자료:\n{context}\n"
+        f"답변:"
+    )
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "meta-llama/llama-3.3-8b-instruct:free",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 256
+    }
+    try:
+        response = requests.post(API_URL, headers=headers, data=json.dumps(payload))
+        print("응답 코드:", response.status_code)  # 디버깅용
+        print("응답 본문:", response.text)        # 디버깅용
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"예외 발생: {e}"
+
+##### RAG
+system_prompt = "당신은 한국 대학생을 위한 챗봇입니다. 모든 답변은 한국어로 해주세요."
+
+def rag_pipeline(user_question):
+    # 1. 서브카테고리 분류
+    subcat = predict_subcategory(user_question, subcat_model, subcat_tokenizer, le)
+    # 2. 서브카테고리 → 카테고리 매핑
+    bigcat = subcategory_to_category.get(subcat)
+    if not bigcat:
+        return "해당 질문의 카테고리를 찾을 수 없습니다. 게시판에 글을 올려주세요."
+    # 3. Qdrant에서 유사 질문 5개(유사도 0.7 이상) 검색
+    similar_qas = search_similar_questions(user_question, bigcat, embed_model, qdrant_client, top_k=5, threshold=0.7)
+    if not similar_qas:
+        return "해당하는 질문이 없습니다. 게시판에 글을 올려주세요."
+    # 4. 답변 생성
+    answer = generate_answer_openrouter(user_question, similar_qas, system_prompt=system_prompt)
+    references = "\n".join(
+        [f"Q{i+1}: {q}\nA{i+1}: {a}" for i, (q, a, score) in enumerate(similar_qas)])
+    return f"AI 답변:\n{answer}\n\n[참고한 Q&A]\n{references}"
