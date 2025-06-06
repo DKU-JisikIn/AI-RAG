@@ -119,7 +119,15 @@ def generate_answer_openrouter(question, context_list, system_prompt=None):
         return f"예외 발생: {e}"
 
 ##### RAG
-system_prompt = "당신은 한국 대학생을 위한 챗봇입니다. 모든 답변은 한국어로 해주세요."
+system_prompt = (
+    "당신은 단국대학생을 위한 대학생 전문 챗봇입니다. "
+    "아래 참고자료를 바탕으로, 사용자의 질문에 대해 정확하고 친절하게 답변하세요. "
+    "반드시 참고자료의 내용을 근거로 답변하고, 근거가 없으면 '자료에 해당 정보가 없습니다.'라고 안내하세요. "
+    "답변은 3문장 이내로 간결하게 작성하세요. "
+    "비슷한 내용의 문장은 나열하지 말아주세요. "
+    "중요: 반드시 한국어로만 답변하세요. 영어, 태국어, 일본어 등 외국어, 특수문자, 오타를 절대 사용하지 마세요. "
+    "F학점 등 학점 표기는 그대로 사용해도 되지만, 그 외에는 한글만 사용하세요."
+)
 
 def rag_pipeline(user_question):
     # 1. 서브카테고리 분류
@@ -127,7 +135,7 @@ def rag_pipeline(user_question):
     # 2. 서브카테고리 → 카테고리 매핑
     bigcat = subcategory_to_category.get(subcat)
     if not bigcat:
-        return "해당 질문의 카테고리를 찾을 수 없습니다. 게시판에 글을 올려주세요."
+        return "해당 질문의 카테고리를 찾을 수 없습니다. 다시 질문해주세요."
     # 3. Qdrant에서 유사 질문 5개(유사도 0.7 이상) 검색
     similar_qas = search_similar_questions(user_question, bigcat, embed_model, qdrant_client, top_k=5, threshold=0.7)
     if not similar_qas:
