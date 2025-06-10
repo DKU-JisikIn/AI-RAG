@@ -1,0 +1,7 @@
+numpy>=1.23.0
+joblib>=1.2.0
+transformers>=4.38.0
+onnxruntime>=1.17.0
+sentence-transformers>=2.6.0
+qdrant-client>=1.7.0
+requests>=2.31.0
