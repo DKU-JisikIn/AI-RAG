@@ -81,7 +81,7 @@ def generate_answer_openrouter(question, context_list, system_prompt=None):
         "Content-Type": "application/json"
     }
     payload = {
-        "model": "meta-llama/llama-3.3-8b-instruct:free",
+        "model": "gpt-4.1-2025-04-14",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 256
     }
@@ -118,3 +118,7 @@ def rag_pipeline(user_question):
     id_list = [qid for qid, a, score in similar_qas]
     references = f"참고한 Q&A id 리스트: {id_list}"
     return f"\n{answer}\n\n{references}"
+
+user_question = input("")
+answer = rag_pipeline(user_question)
+print(f"{answer}")
