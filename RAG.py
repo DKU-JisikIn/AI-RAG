@@ -60,7 +60,7 @@ def search_similar_questions(question, collection_name, embed_model, client, top
         with_vectors=True
     )
     filtered = [
-        (hit.payload["question"], hit.payload["answer"], hit.score)
+        (hit.id, hit.payload["answer"], hit.score)
         for hit in results if hit.score >= threshold
     ]
     return filtered
@@ -102,7 +102,8 @@ system_prompt = (
     "답변은 3문장 이내로 간결하게 작성하세요. "
     "비슷한 내용의 문장은 나열하지 말아주세요. "
     "중요: 반드시 한국어로만 답변하세요. 영어, 태국어, 일본어 등 외국어, 특수문자, 오타를 절대 사용하지 마세요. "
-    "F학점 등 학점 표기는 그대로 사용해도 되지만, 그 외에는 한글만 사용하세요."
+    "F학점 등 학점 표기는 그대로 사용해도 되지만, 그 외에는 한글만 사용하세요. "
+        "죽전캠퍼스 대상 챗봇이므로 천안 관련 답변은 하지 말아주세요. "
 )
 
 def rag_pipeline(user_question):
@@ -114,6 +115,6 @@ def rag_pipeline(user_question):
     if not similar_qas:
         return "해당하는 질문이 없습니다. 게시판에 글을 올려주세요."
     answer = generate_answer_openrouter(user_question, similar_qas, system_prompt=system_prompt)
-    references = "\n".join(
-        [f"Q{i+1}: {q}\nA{i+1}: {a}" for i, (q, a, score) in enumerate(similar_qas)])
-    return f"AI 답변:\n{answer}\n\n[참고한 Q&A]\n{references}"
+    id_list = [qid for qid, a, score in similar_qas]
+    references = f"참고한 Q&A id 리스트: {id_list}"
+    return f"\n{answer}\n\n{references}"
