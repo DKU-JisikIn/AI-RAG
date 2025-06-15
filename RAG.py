@@ -7,8 +7,17 @@ import onnxruntime as ort
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 import requests
+import os
+from dotenv import load_dotenv
 import warnings
 warnings.filterwarnings("ignore")
+
+##### .env 파일에서 환경변수 불러오기
+load_dotenv()
+
+QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+QDRANT_URL = os.environ.get("QDRANT_URL")
 
 ##### 모델 및 라벨 인코더 로딩
 session = ort.InferenceSession("subcat_model_quant.onnx")
@@ -17,8 +26,8 @@ tokenizer = AutoTokenizer.from_pretrained("klue/roberta-base")
 
 ##### 임베딩 모델 로딩
 qdrant_client = QdrantClient(
-    url="https://2a09054d-de92-436e-bf8c-158f44d82df4.us-east4-0.gcp.cloud.qdrant.io:6333",
-    api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.1VAec5LQRLXCskcPERZg3WgNpTpj00q4ZwVqVkCy0RA",
+    url=QDRANT_URL,
+    api_key=QDRANT_API_KEY,
     timeout=60.0
 )
 embed_model = SentenceTransformer("BM-K/KoSimCSE-roberta")
@@ -77,7 +86,7 @@ def generate_answer_openrouter(question, context_list, system_prompt=None):
         f"답변:"
     )
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
     payload = {
