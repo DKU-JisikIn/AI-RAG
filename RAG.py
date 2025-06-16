@@ -75,7 +75,6 @@ def search_similar_questions(question, collection_name, embed_model, client, top
     return filtered
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
-# API_KEY = ""
 
 def generate_answer_openrouter(question, context_list, system_prompt=None):
     context = "\n".join([f"Q: {q}\nA: {a}" for q, a, score in context_list])
