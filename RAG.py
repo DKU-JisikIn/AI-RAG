@@ -129,8 +129,15 @@ def rag_pipeline(user_question):
         return "해당하는 질문이 없습니다. 게시판에 글을 올려주세요."
     context_list = [(qa["question"], qa["answer"], qa["score"]) for qa in similar_qas]
     answer = generate_answer_openrouter(user_question, context_list, system_prompt=system_prompt)
-    references = f"참고한 Question: {json.dumps([{'question': qa['question'], 'source': qa['source']} for qa in similar_qas], ensure_ascii=False)}"
-    return f"\n{answer}\n\n{references}"
+    references = [
+    {'title': qa['question'], 'source': qa['source']}
+    for qa in similar_qas
+    ]
+    
+    return {
+    "answer": answer,
+    "references": references
+    }
 
 user_question = input("")
 answer = rag_pipeline(user_question)
