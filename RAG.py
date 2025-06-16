@@ -69,12 +69,18 @@ def search_similar_questions(question, collection_name, embed_model, client, top
         with_vectors=True
     )
     filtered = [
-        (hit.payload["question"], hit.payload["answer"], hit.score)
+        {
+            "question": hit.payload["question"],
+            "answer": hit.payload["answer"],
+            "score": hit.score,
+            "source": hit.payload.get("source", None)
+        }
         for hit in results if hit.score >= threshold
     ]
     return filtered
 
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
+# API_KEY = ""
 
 def generate_answer_openrouter(question, context_list, system_prompt=None):
     context = "\n".join([f"Q: {q}\nA: {a}" for q, a, score in context_list])
@@ -122,9 +128,9 @@ def rag_pipeline(user_question):
     similar_qas = search_similar_questions(user_question, bigcat, embed_model, qdrant_client, top_k=5, threshold=0.7)
     if not similar_qas:
         return "해당하는 질문이 없습니다. 게시판에 글을 올려주세요."
-    answer = generate_answer_openrouter(user_question, similar_qas, system_prompt=system_prompt)
-    question_list = [q for q, a, score in similar_qas]
-    references = f"참고한 Qusetion: {question_list}"
+    context_list = [(qa["question"], qa["answer"], qa["score"]) for qa in similar_qas]
+    answer = generate_answer_openrouter(user_question, context_list, system_prompt=system_prompt)
+    references = f"참고한 Question: {json.dumps([{'question': qa['question'], 'source': qa['source']} for qa in similar_qas], ensure_ascii=False)}"
     return f"\n{answer}\n\n{references}"
 
 user_question = input("")
