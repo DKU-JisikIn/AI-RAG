@@ -69,7 +69,7 @@ def search_similar_questions(question, collection_name, embed_model, client, top
         with_vectors=True
     )
     filtered = [
-        (hit.id, hit.payload["answer"], hit.score)
+        (hit.payload["question"], hit.payload["answer"], hit.score)
         for hit in results if hit.score >= threshold
     ]
     return filtered
@@ -124,8 +124,8 @@ def rag_pipeline(user_question):
     if not similar_qas:
         return "해당하는 질문이 없습니다. 게시판에 글을 올려주세요."
     answer = generate_answer_openrouter(user_question, similar_qas, system_prompt=system_prompt)
-    id_list = [qid for qid, a, score in similar_qas]
-    references = f"참고한 Q&A id 리스트: {id_list}"
+    question_list = [q for q, a, score in similar_qas]
+    references = f"참고한 Qusetion: {question_list}"
     return f"\n{answer}\n\n{references}"
 
 user_question = input("")
