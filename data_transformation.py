@@ -1,5 +1,6 @@
 import os
 import re
+import title_generator
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 
@@ -94,3 +95,44 @@ for collection_name in collection_name:
                     payload={"question": new_question},
                     points=[point.id]
                 )
+
+##### 질문 형태에 안 맞는 질문 변경
+def is_not_valid_question_format(question):
+    return not (isinstance(question, str) and ' - ' in question)
+
+for collection_name in collection_name:
+    print(f"Processing collection: {collection_name}")
+    scroll_offset = None
+
+    while True:
+        points, scroll_offset = client.scroll(
+            collection_name=collection_name,
+            limit=1000,
+            offset=scroll_offset,
+            with_payload=True
+        )
+        if not points:
+            break
+
+        for point in points:
+            payload = point.payload
+            if payload.get("source") != "VOC":
+                continue
+            question = payload.get("question")
+            subcategory = payload.get("subcategory", "")
+            if is_not_valid_question_format(question):
+                # {subcategory} 뒤의 모든 내용을 질문내용으로 간주
+                if question.startswith(subcategory):
+                    question_content = question[len(subcategory):].strip()
+                else:
+                    question_content = question.strip()
+                # 제목 생성 및 재구성
+                new_title = title_generator.generate_title_openrouter(question_content)
+                new_question = f"{subcategory}{new_title} - {question_content}"
+                # Qdrant에 반영
+                client.set_payload(
+                    collection_name=collection_name,
+                    payload={"question": new_question},
+                    points=[point.id]
+                )
+                print(f"Updated point {point.id} in {collection_name}")
