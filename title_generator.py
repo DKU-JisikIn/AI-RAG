@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
+API_URL = "https://api.openai.com/v1/chat/completions"
 
 def generate_title_openrouter(post_content, system_prompt=None):
     system_prompt = system_prompt or (

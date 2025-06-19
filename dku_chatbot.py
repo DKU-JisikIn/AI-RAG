@@ -23,7 +23,7 @@ QDRANT_API_KEY = os.environ.get("QDRANT_API_KEY")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 QDRANT_URL = os.environ.get("QDRANT_URL")
 
-API_URL = "https://openrouter.ai/api/v1/chat/completions"
+API_URL = "https://api.openai.com/v1/chat/completions"
 
 class ChatBot:
     ##### 모델 및 라벨 인코더 로딩

@@ -115,6 +115,9 @@ for collection_name in collection_name:
             break
 
         for point in points:
+            if int(point.id) >= 450:
+                continue
+
             payload = point.payload
             if payload.get("source") != "VOC":
                 continue
@@ -126,10 +129,11 @@ for collection_name in collection_name:
                     question_content = question[len(subcategory):].strip()
                 else:
                     question_content = question.strip()
-                # 제목 생성 및 재구성
+                # ChatGPT로 제목 생성
                 new_title = title_generator.generate_title_openrouter(question_content)
-                new_question = f"{subcategory}{new_title} - {question_content}"
-                # Qdrant에 반영
+                subcategory_bracketed = f"{{{subcategory}}}" if subcategory else ""
+                new_question = f"{subcategory_bracketed}{new_title} - {question_content}"
+                # Qdrant에 바로 반영
                 client.set_payload(
                     collection_name=collection_name,
                     payload={"question": new_question},
