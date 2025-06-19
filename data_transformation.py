@@ -117,23 +117,16 @@ for collection_name in collection_name:
         for point in points:
             if int(point.id) >= 450:
                 continue
-
             payload = point.payload
-            if payload.get("source") != "VOC":
-                continue
-            question = payload.get("question")
-            subcategory = payload.get("subcategory", "")
+            question = payload.get("question", "")
+            predicted_subcategory = payload.get("predicted_subcategory", "")
             if is_not_valid_question_format(question):
-                # {subcategory} 뒤의 모든 내용을 질문내용으로 간주
-                if question.startswith(subcategory):
-                    question_content = question[len(subcategory):].strip()
-                else:
-                    question_content = question.strip()
+                question_content = re.sub(r'^\{[^}]*\}', '', question).strip()
                 # ChatGPT로 제목 생성
                 new_title = title_generator.generate_title_openrouter(question_content)
-                subcategory_bracketed = f"{{{subcategory}}}" if subcategory else ""
+                subcategory_bracketed = f"{{{predicted_subcategory}}}" if predicted_subcategory else ""
                 new_question = f"{subcategory_bracketed}{new_title} - {question_content}"
-                # Qdrant에 바로 반영
+                # Qdrant에 반영
                 client.set_payload(
                     collection_name=collection_name,
                     payload={"question": new_question},
