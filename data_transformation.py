@@ -133,3 +133,42 @@ for collection_name in collection_name:
                     points=[point.id]
                 )
                 print(f"Updated point {point.id} in {collection_name}")
+
+##### [] 포함 내용 삭제 부분
+for collection_name in collection_name:
+    print(f"Processing collection: {collection_name}")
+    scroll_offset = None
+    total_processed = 0
+
+    while True:
+        result = client.scroll(
+            collection_name=collection_name,
+            limit=1000,
+            offset=scroll_offset,
+            with_payload=True
+        )
+        points = result[0]
+        next_page_offset = result[1]
+
+        if not points:
+            break
+
+        for point in points:
+            total_processed += 1
+            payload = point.payload
+            question = payload.get("question", "")
+            new_question = re.sub(r'\[[^]]*\]', '', question).strip()
+            if new_question != question:
+                client.set_payload(
+                    collection_name=collection_name,
+                    payload={"question": new_question},
+                    points=[point.id]
+                )
+                print(f"[{total_processed}] Updated point {point.id} in {collection_name}: {question} -> {new_question}")
+
+        # 반드시 offset 갱신!
+        scroll_offset = next_page_offset
+        if scroll_offset is None:
+            break
+
+    print(f"{collection_name} 컬렉션의 데이터 처리가 완료되었습니다. 총 {total_processed}개 포인트를 확인했습니다.\n")
