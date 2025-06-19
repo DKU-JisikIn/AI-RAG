@@ -59,3 +59,38 @@ points, _ = client.scroll(
 )
 for point in points:
     print(point.id, point.payload.get("question"))
+
+##### 소분류 대괄호를 중괄호로 변경
+for collection_name in collection_name:
+    print(f"Processing collection: {collection_name}")
+    all_points = []
+    scroll_offset = None
+
+    # 모든 포인트 불러오기 (scroll)
+    while True:
+        points, scroll_offset = client.scroll(
+            collection_name=collection_name,
+            limit=1000,
+            offset=scroll_offset
+        )
+        if not points:
+            break
+        all_points.extend(points)
+        if scroll_offset is None:
+            break
+
+    # 각 포인트의 question 필드 전처리 및 Qdrant에 반영
+    for point in all_points:
+        question = point.payload.get("question")
+        if question:
+            match = re.match(r'^\[([^\]]*)\](.*)', question)
+            if match:
+                inside_brackets = match.group(1)
+                rest = match.group(2)
+                new_question = f"{{{inside_brackets}}}{rest}"
+                # Qdrant에 반영
+                client.set_payload(
+                    collection_name=collection_name,
+                    payload={"question": new_question},
+                    points=[point.id]
+                )
