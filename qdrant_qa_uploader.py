@@ -74,7 +74,8 @@ def save_qa_to_qdrant(question, answer):
     # 4. 인덱스 보장
     ensure_keyword_indexes(collection_name)
     # 5. 중복 체크
-    if is_duplicate(question, answer, collection_name):
+    formatted_question = f"[{predicted_subcategory}] {question}"
+    if is_duplicate(formatted_question, answer, collection_name):
         print("이미 동일한 질문/답변 쌍이 존재합니다. 저장하지 않습니다.")
         return None
     # 6. 질문 벡터 임베딩
@@ -92,7 +93,7 @@ def save_qa_to_qdrant(question, answer):
                 "campus": "죽전",
                 "category": predicted_category,
                 "subcategory": predicted_subcategory,
-                "question": question,
+                "question": f"[{predicted_subcategory}] {question}",
                 "answer": answer,
                 "source": "DKU Jisikin",
                 "predicted_category": predicted_category,
